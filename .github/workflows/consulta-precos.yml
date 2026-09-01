@@ -21,9 +21,11 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Recriar credenciais do Google
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
         run: |
           mkdir -p credentials
-          echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > credentials/google_service_account.json
+          printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials/google_service_account.json
 
       - name: Rodar consulta de preços
         env:
