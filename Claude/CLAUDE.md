@@ -35,13 +35,22 @@ oportunidade. Vou usar o VS Code + Claude Code para desenvolver.
 
 ## Status atual / próximo passo
 Etapas 4 a 7 concluídas e testadas ponta a ponta, inclusive rodando de
-verdade na nuvem. `src/consulta_precos.py` consulta o endpoint
-`v1/prices/cheap` da Data API do Travelpayouts para as rotas em
-`config/rotas.py` (GRU→LIS, MAD, ROM, MIL); `src/planilha.py` grava cada
-consulta como uma linha na aba "historico" do Google Sheets (auth via
-service account) e calcula o menor preço já visto por rota a partir desse
-histórico bruto; `src/notificacao.py` envia a mensagem de oportunidade via
-bot do Telegram sempre que o preço atual é um novo mínimo para a rota.
+verdade na nuvem. `src/consulta_precos.py` busca preços de duas formas:
+(a) data fixa/sem data, via `v1/prices/cheap`; (b) intervalo de datas +
+duração da viagem (campos `data_inicio`/`data_fim`/`dias_viagem` na rota),
+via `v1/prices/calendar` consultado mês a mês, ficando com a data mais
+barata da janela inteira. `src/planilha.py` grava cada consulta como uma
+linha na aba "historico" do Google Sheets (auth via service account) e
+calcula o menor preço já visto por chave — rota sozinha, ou rota+duração
+quando há `dias_viagem` (preços de estadias diferentes não são
+comparáveis). `src/companhias.py` traduz o código IATA da companhia pro
+nome conhecido (ex: AZ → ITA Airways, KL → KLM, DT → TAAG Angola) usando
+o arquivo de referência público do Travelpayouts (`data/pt/airlines.json`,
+não precisa de token). `src/notificacao.py` envia a mensagem de
+oportunidade via bot do Telegram sempre que o preço atual é um novo
+mínimo pra chave. Rotas hoje em `config/rotas.py`: GRU→LIS, GRU→MAD,
+GRU→ROM, GRU→MIL (data fixa) e GRU→LIS fev-mai/2027 por 20 dias
+(intervalo).
 Repositório: github.com/luizgoncalvesLG/Flights (conta dona do repo —
 cuidado, há outra conta gh `luizgoncalvesTrampay` na mesma máquina sem
 acesso a esse repo). Workflow `.github/workflows/consulta-precos.yml` roda
@@ -53,8 +62,9 @@ conteúdo inteiro do JSON da service account —, `TELEGRAM_BOT_TOKEN`,
 do secret usando `printf` com o valor vindo de `env:` (NÃO usar
 `echo "${{ secrets.X }}"` direto dentro de aspas — quebra se o JSON tiver
 aspas internas) e valida que o JSON gerado é válido antes de seguir.
-Confirmado rodando com sucesso via `gh run view` — consultou preços reais,
-comparou com a planilha e não disparou notificação à toa.
+Confirmado rodando com sucesso na nuvem (`gh run view`), inclusive com a
+busca por intervalo — consultou preços reais, comparou com a planilha e
+não disparou notificação à toa.
 Próximo passo: etapa 8, deixar rodando 1–2 semanas e ajustar regras de
 alerta conforme os resultados reais.
 
@@ -67,6 +77,11 @@ alerta conforme os resultados reais.
 6. [x] Implementar a lógica de comparação e alerta
 7. [x] Automatizar com GitHub Actions
 8. [ ] Testar e ajustar as regras de alerta por 1–2 semanas  ← estamos aqui
+
+## Evoluções pós-roteiro inicial
+- Busca por intervalo de datas + duração da viagem (não estava no roteiro
+  original, adicionado depois a pedido do usuário).
+- Nomes de companhia aérea legíveis em vez de código IATA.
 
 ## Convenções do projeto
 - Linguagem: Python.
