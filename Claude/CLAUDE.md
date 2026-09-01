@@ -48,9 +48,20 @@ nome conhecido (ex: AZ → ITA Airways, KL → KLM, DT → TAAG Angola) usando
 o arquivo de referência público do Travelpayouts (`data/pt/airlines.json`,
 não precisa de token). `src/notificacao.py` envia a mensagem de
 oportunidade via bot do Telegram sempre que o preço atual é um novo
-mínimo pra chave. Rotas hoje em `config/rotas.py`: GRU→LIS, GRU→MAD,
-GRU→ROM, GRU→MIL (data fixa) e GRU→LIS fev-mai/2027 por 20 dias
-(intervalo).
+mínimo pra chave, com preço em R$ (separador de milhar), datas de ida e
+volta em dd/mm/aaaa e "Cia: X / Voo: Y" em campo separado. Rotas hoje em
+`config/rotas.py`: todas no formato intervalo+duração, abril-maio/2027,
+20 dias — GRU→LIS, MAD→LIS, GRU→ROM, GRU→MIL.
+
+**Limitação conhecida:** o endpoint `v1/prices/calendar` só devolve preço
+quando existe cache pra aquela combinação exata de rota+mês+duração — é
+alimentado por buscas reais de usuários da Aviasales, não por toda rota
+possível. Rotas/durações menos populares (ex: MAD→LIS ou GRU→MIL com 20
+dias) frequentemente voltam "nenhum preço encontrado", mesmo a rota tendo
+cache fora daquela duração específica (confirmado testando sem `length`).
+Decisão do usuário: manter assim — o cron roda a cada 3h e o cache muda
+com o tempo, então pode aparecer dado numa execução futura sem precisar
+mexer no código.
 Repositório: github.com/luizgoncalvesLG/Flights (conta dona do repo —
 cuidado, há outra conta gh `luizgoncalvesTrampay` na mesma máquina sem
 acesso a esse repo). Workflow `.github/workflows/consulta-precos.yml` roda
