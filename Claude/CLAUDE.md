@@ -34,20 +34,29 @@ oportunidade. Vou usar o VS Code + Claude Code para desenvolver.
    de visualização inicial.
 
 ## Status atual / próximo passo
-Etapas 4, 5 e 6 concluídas e testadas ponta a ponta. `src/consulta_precos.py`
-consulta o endpoint `v1/prices/cheap` da Data API do Travelpayouts para as
-rotas em `config/rotas.py` (GRU→LIS, MAD, ROM, MIL); `src/planilha.py`
-grava cada consulta como uma linha na aba "historico" do Google Sheets
-(auth via service account, JSON em `credentials/google_service_account.json`,
-fora do git) e calcula o menor preço já visto por rota a partir desse
+Etapas 4 a 7 concluídas e testadas ponta a ponta, inclusive rodando de
+verdade na nuvem. `src/consulta_precos.py` consulta o endpoint
+`v1/prices/cheap` da Data API do Travelpayouts para as rotas em
+`config/rotas.py` (GRU→LIS, MAD, ROM, MIL); `src/planilha.py` grava cada
+consulta como uma linha na aba "historico" do Google Sheets (auth via
+service account) e calcula o menor preço já visto por rota a partir desse
 histórico bruto; `src/notificacao.py` envia a mensagem de oportunidade via
-bot do Telegram (token e chat ID no `.env`) sempre que o preço atual é um
-novo mínimo para a rota. Testes feitos: execução normal não dispara nada
-quando não há novidade; teste ponta a ponta inflando temporariamente (e
-revertendo depois) o histórico de uma rota confirmou que a notificação
-real chega no Telegram só para a rota que teve queda de preço, sem
-disparar para as demais — comportamento de "evitar spam" funcionando.
-Próximo passo: etapa 7, automatizar com GitHub Actions (cron agendado).
+bot do Telegram sempre que o preço atual é um novo mínimo para a rota.
+Repositório: github.com/luizgoncalvesLG/Flights (conta dona do repo —
+cuidado, há outra conta gh `luizgoncalvesTrampay` na mesma máquina sem
+acesso a esse repo). Workflow `.github/workflows/consulta-precos.yml` roda
+a cada 3 horas (cron `0 */3 * * *`, em UTC) e também aceita disparo manual
+via `workflow_dispatch`. Os segredos ficam em GitHub Secrets
+(`TRAVELPAYOUTS_TOKEN`, `GOOGLE_SHEETS_ID`, `GOOGLE_CREDENTIALS_JSON` —
+conteúdo inteiro do JSON da service account —, `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_CHAT_ID`); o workflow recria o arquivo de credenciais a partir
+do secret usando `printf` com o valor vindo de `env:` (NÃO usar
+`echo "${{ secrets.X }}"` direto dentro de aspas — quebra se o JSON tiver
+aspas internas) e valida que o JSON gerado é válido antes de seguir.
+Confirmado rodando com sucesso via `gh run view` — consultou preços reais,
+comparou com a planilha e não disparou notificação à toa.
+Próximo passo: etapa 8, deixar rodando 1–2 semanas e ajustar regras de
+alerta conforme os resultados reais.
 
 ## Roteiro completo
 1. [x] Criar conta no Travelpayouts e pegar a API key
@@ -56,8 +65,8 @@ Próximo passo: etapa 7, automatizar com GitHub Actions (cron agendado).
 4. [x] Escrever o script de consulta em Python
 5. [x] Salvar histórico de preços no Google Sheets
 6. [x] Implementar a lógica de comparação e alerta
-7. [ ] Automatizar com GitHub Actions  ← estamos aqui
-8. [ ] Testar e ajustar as regras de alerta por 1–2 semanas
+7. [x] Automatizar com GitHub Actions
+8. [ ] Testar e ajustar as regras de alerta por 1–2 semanas  ← estamos aqui
 
 ## Convenções do projeto
 - Linguagem: Python.
