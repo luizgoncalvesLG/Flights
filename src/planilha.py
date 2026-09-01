@@ -22,12 +22,23 @@ CABECALHO = [
     "voo",
     "data_ida",
     "data_volta",
+    "dias_viagem",
 ]
+
+
+def montar_chave(origem: str, destino: str, dias_viagem: Optional[int] = None) -> str:
+    """Chave usada para agrupar o histórico. Quando há duração de viagem
+    definida, ela entra na chave — preços de estadias diferentes não são
+    comparáveis entre si."""
+    if dias_viagem:
+        return f"{origem}-{destino}-{dias_viagem}d"
+    return f"{origem}-{destino}"
 
 
 def conectar() -> gspread.Worksheet:
     """Autentica com a service account e retorna a aba de histórico,
-    criando a aba e o cabeçalho se ainda não existirem."""
+    criando a aba e o cabeçalho se ainda não existirem (e atualizando o
+    cabeçalho se novas colunas tiverem sido adicionadas)."""
     caminho_credenciais = os.environ.get(
         "GOOGLE_CREDENTIALS_PATH", "credentials/google_service_account.json"
     )
@@ -41,6 +52,8 @@ def conectar() -> gspread.Worksheet:
 
     try:
         aba = planilha.worksheet(NOME_ABA)
+        if aba.row_values(1) != CABECALHO:
+            aba.update("A1", [CABECALHO])
     except gspread.WorksheetNotFound:
         aba = planilha.add_worksheet(title=NOME_ABA, rows=1000, cols=len(CABECALHO))
         aba.append_row(CABECALHO)
@@ -49,11 +62,11 @@ def conectar() -> gspread.Worksheet:
 
 
 def carregar_menor_preco_por_rota(aba: gspread.Worksheet) -> dict:
-    """Lê todo o histórico e retorna o menor preço já visto por rota
-    (chave "ORIGEM-DESTINO")."""
+    """Lê todo o histórico e retorna o menor preço já visto por chave
+    (rota, ou rota+duração quando aplicável — ver montar_chave)."""
     menores: dict = {}
     for registro in aba.get_all_records():
-        chave = f"{registro['origem']}-{registro['destino']}"
+        chave = montar_chave(registro["origem"], registro["destino"], registro.get("dias_viagem") or None)
         preco = registro["preco"]
         if chave not in menores or preco < menores[chave]:
             menores[chave] = preco
@@ -71,8 +84,20 @@ def registrar_consulta(
     voo: str,
     data_ida: str,
     data_volta: Optional[str],
+    dias_viagem: Optional[int] = None,
 ) -> None:
     """Acrescenta uma linha de histórico na planilha."""
     aba.append_row(
-        [timestamp, origem, destino, preco, moeda, companhia, voo, data_ida, data_volta or ""]
+        [
+            timestamp,
+            origem,
+            destino,
+            preco,
+            moeda,
+            companhia,
+            voo,
+            data_ida,
+            data_volta or "",
+            dias_viagem or "",
+        ]
     )
