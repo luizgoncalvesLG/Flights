@@ -26,6 +26,14 @@ jobs:
         run: |
           mkdir -p credentials
           printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials/google_service_account.json
+          if [ ! -s credentials/google_service_account.json ]; then
+            echo "::error::O secret GOOGLE_CREDENTIALS_JSON está vazio ou não foi configurado."
+            exit 1
+          fi
+          python -c "import json; json.load(open('credentials/google_service_account.json'))" || {
+            echo "::error::O conteúdo de GOOGLE_CREDENTIALS_JSON não é um JSON válido."
+            exit 1
+          }
 
       - name: Rodar consulta de preços
         env:
