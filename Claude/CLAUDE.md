@@ -47,9 +47,14 @@ comparáveis). `src/companhias.py` traduz o código IATA da companhia pro
 nome conhecido (ex: AZ → ITA Airways, KL → KLM, DT → TAAG Angola) usando
 o arquivo de referência público do Travelpayouts (`data/pt/airlines.json`,
 não precisa de token). `src/notificacao.py` envia a mensagem de
-oportunidade via bot do Telegram sempre que o preço atual é um novo
-mínimo pra chave, com preço em R$ (separador de milhar), datas de ida e
-volta em dd/mm/aaaa e "Cia: X / Voo: Y" em campo separado. Rotas hoje em
+oportunidade via bot do Telegram (para todos os chat_ids em
+`TELEGRAM_CHAT_IDS`, lista separada por vírgula — hoje Luiz e Monica)
+sempre que o preço atual é um novo mínimo pra chave, com preço em R$
+(separador de milhar), datas de ida e volta em dd/mm/aaaa e
+"Cia: X / Voo: Y" em campo separado. Pra descobrir o chat_id de uma nova
+pessoa: ela dá `/start` no bot, depois
+`GET https://api.telegram.org/bot<TOKEN>/getUpdates` mostra o chat_id nas
+mensagens recentes. Rotas hoje em
 `config/rotas.py`: todas no formato intervalo+duração, abril-maio/2027,
 20 dias — GRU→LIS, MAD→LIS, GRU→ROM, GRU→MIL.
 
