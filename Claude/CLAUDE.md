@@ -62,6 +62,11 @@ cache fora daquela duração específica (confirmado testando sem `length`).
 Decisão do usuário: manter assim — o cron roda a cada 3h e o cache muda
 com o tempo, então pode aparecer dado numa execução futura sem precisar
 mexer no código.
+
+**Actions do workflow:** `actions/checkout` e `actions/setup-python`
+atualizadas para `@v7` (estavam em v4/v5, que rodavam sobre Node.js 20 —
+depreciado e será REMOVIDO dos runners em 16/09/2026; sem atualizar o
+workflow pararia de rodar depois dessa data).
 Repositório: github.com/luizgoncalvesLG/Flights (conta dona do repo —
 cuidado, há outra conta gh `luizgoncalvesTrampay` na mesma máquina sem
 acesso a esse repo). Workflow `.github/workflows/consulta-precos.yml` roda
