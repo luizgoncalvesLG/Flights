@@ -29,6 +29,18 @@ from src import companhias, notificacao, planilha
 URL_CHEAPEST = "https://api.travelpayouts.com/v1/prices/cheap"
 URL_CALENDARIO = "https://api.travelpayouts.com/v1/prices/calendar"
 
+SIMBOLOS_MOEDA = {"brl": "R$", "usd": "US$", "eur": "€"}
+
+
+def formatar_preco(preco: float, moeda: str) -> str:
+    simbolo = SIMBOLOS_MOEDA.get(moeda.lower(), moeda.upper())
+    valor = f"{preco:,.0f}".replace(",", ".")
+    return f"{simbolo} {valor}"
+
+
+def formatar_data_br(data_iso: str) -> str:
+    return date.fromisoformat(data_iso[:10]).strftime("%d/%m/%Y")
+
 
 def buscar_menor_oferta(
     origem: str,
@@ -209,10 +221,19 @@ def main() -> None:
 
         if eh_oportunidade:
             menores_precos[chave] = preco_atual
+
+            linha_datas = f"saindo em {formatar_data_br(data_ida)}"
+            if data_volta:
+                linha_datas += f" e retornando em {formatar_data_br(data_volta)}"
+
+            linha_cia = f"Cia: {nome_companhia}"
+            if oferta.get("flight_number"):
+                linha_cia += f" / Voo: {oferta['flight_number']}"
+
             notificacao.enviar_mensagem(
                 f"Oportunidade de preço: {origem} -> {destino}\n"
-                f"{preco_atual} {moeda.upper()} em {data_ida}\n"
-                f"Cia: {info_voo}"
+                f"{formatar_preco(preco_atual, moeda)} {linha_datas}\n"
+                f"{linha_cia}"
             )
 
 

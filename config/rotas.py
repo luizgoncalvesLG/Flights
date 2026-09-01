@@ -23,15 +23,32 @@
 # Edite esta lista com as rotas reais de interesse.
 
 ROTAS = [
-    {"origem": "GRU", "destino": "LIS"},
-    {"origem": "GRU", "destino": "MAD"},
-    {"origem": "GRU", "destino": "ROM"},
-    {"origem": "GRU", "destino": "MIL"},
     {
         "origem": "GRU",
         "destino": "LIS",
-        "data_inicio": "2027-02-01",
+        "data_inicio": "2027-04-01",
         "data_fim": "2027-05-30",
         "dias_viagem": 20,
     },
+    {
+        "origem": "MAD",
+        "destino": "LIS",
+        "data_inicio": "2027-04-01",
+        "data_fim": "2027-05-30",
+        "dias_viagem": 20,
+    },
+    {
+        "origem": "GRU",
+        "destino": "ROM",
+        "data_inicio": "2027-04-01",
+        "data_fim": "2027-05-30",
+        "dias_viagem": 20,
+    },
+    {
+        "origem": "GRU",
+        "destino": "MIL",
+        "data_inicio": "2027-04-01",
+        "data_fim": "2027-05-30",
+        "dias_viagem": 20,
+    }
 ]
