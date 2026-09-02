@@ -11,6 +11,12 @@ Cada rota pode ser buscada de duas formas:
   consultando mês a mês dentro do intervalo e ficando com a data mais
   barata encontrada.
 
+Quando uma rota de intervalo não tem preço em cache no Travelpayouts
+(comum para datas muito distantes em rotas menos populares), tenta uma
+vez o FlightAPI.io como fallback, com uma única data representativa (o
+início do intervalo) — ver src/flightapi.py e pode_tentar_flightapi
+abaixo para o controle de frequência (créditos são limitados).
+
 Uso (a partir da raiz do projeto):
     python -m src.consulta_precos
 """
@@ -23,12 +29,23 @@ from typing import Optional
 import requests
 from dotenv import load_dotenv
 
-from src import companhias, notificacao, planilha
+from src import companhias, flightapi, notificacao, planilha
 
 URL_CHEAPEST = "https://api.travelpayouts.com/v1/prices/cheap"
 URL_CALENDARIO = "https://api.travelpayouts.com/v1/prices/calendar"
 
 SIMBOLOS_MOEDA = {"brl": "R$", "usd": "US$", "eur": "€"}
+
+# O FlightAPI.io cobra créditos por chamada, então o fallback só é
+# tentado de novo depois desse intervalo, por chave sem preço.
+INTERVALO_MINIMO_FLIGHTAPI = timedelta(hours=24)
+
+
+def pode_tentar_flightapi(ultima_tentativa: Optional[str]) -> bool:
+    if not ultima_tentativa:
+        return True
+    momento = datetime.fromisoformat(ultima_tentativa)
+    return datetime.now(timezone.utc) - momento >= INTERVALO_MINIMO_FLIGHTAPI
 
 
 def formatar_preco(preco: float, moeda: str) -> str:
@@ -160,12 +177,38 @@ def main() -> None:
     if not rotas:
         sys.exit("Nenhuma rota cadastrada na aba 'rotas' da planilha.")
 
-    menores_precos = planilha.carregar_menor_preco_por_rota(aba_historico)
+    registros_historico = planilha.carregar_registros_historico(aba_historico)
+    menores_precos = planilha.calcular_menor_preco_por_rota(registros_historico)
+    ultimas_tentativas_flightapi = planilha.calcular_ultima_consulta_flightapi(registros_historico)
     nomes_companhias = companhias.carregar_nomes()
 
+    linhas_historico = []
+
+    try:
+        _consultar_e_notificar(
+            rotas, moeda, token, menores_precos, ultimas_tentativas_flightapi,
+            nomes_companhias, linhas_historico,
+        )
+    finally:
+        planilha.salvar_historico(aba_historico, linhas_historico)
+
+
+def _consultar_e_notificar(
+    rotas: list[dict],
+    moeda: str,
+    token: str,
+    menores_precos: dict,
+    ultimas_tentativas_flightapi: dict,
+    nomes_companhias: dict,
+    linhas_historico: list,
+) -> None:
+    """Consulta cada rota, notifica oportunidades e acumula as linhas de
+    histórico em linhas_historico (gravadas em lote pelo chamador, mesmo
+    se esta função levantar uma exceção no meio do caminho)."""
     for rota in rotas:
         origem, destino = rota["origem"], rota["destino"]
         dias_viagem = rota.get("dias_viagem")
+        fonte = "travelpayouts"
 
         if "data_inicio" in rota and "data_fim" in rota:
             data_ida, oferta = buscar_menor_oferta_intervalo(
@@ -190,6 +233,26 @@ def main() -> None:
 
         chave = planilha.montar_chave(origem, destino, dias_viagem)
 
+        if oferta is None and "data_inicio" in rota and dias_viagem:
+            ultima_tentativa = ultimas_tentativas_flightapi.get(chave)
+            if pode_tentar_flightapi(ultima_tentativa):
+                data_ida_fallback = rota["data_inicio"]
+                data_volta_fallback = (
+                    date.fromisoformat(data_ida_fallback) + timedelta(days=dias_viagem)
+                ).isoformat()
+                try:
+                    oferta = flightapi.buscar_menor_oferta(
+                        origem, destino, data_ida_fallback, data_volta_fallback, moeda
+                    )
+                except (requests.RequestException, KeyError, ValueError) as erro:
+                    print(f"{chave}: falha ao consultar FlightAPI ({erro})")
+                    oferta = None
+                if oferta:
+                    data_ida = oferta["departure_at"]
+                    fonte = "flightapi"
+            else:
+                print(f"{chave}: sem preço no Travelpayouts, fallback FlightAPI aguardando janela de 24h")
+
         if oferta is None:
             print(f"{chave}: nenhum preço encontrado")
             continue
@@ -211,18 +274,20 @@ def main() -> None:
         if data_volta is None and dias_viagem:
             data_volta = (date.fromisoformat(data_ida[:10]) + timedelta(days=dias_viagem)).isoformat()
 
-        planilha.registrar_consulta(
-            aba_historico,
-            timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            origem=origem,
-            destino=destino,
-            preco=preco_atual,
-            moeda=moeda,
-            companhia=nome_companhia,
-            voo=str(oferta["flight_number"]) if oferta.get("flight_number") else "",
-            data_ida=data_ida,
-            data_volta=data_volta,
-            dias_viagem=dias_viagem,
+        linhas_historico.append(
+            planilha.montar_linha_historico(
+                timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                origem=origem,
+                destino=destino,
+                preco=preco_atual,
+                moeda=moeda,
+                companhia=nome_companhia,
+                voo=str(oferta["flight_number"]) if oferta.get("flight_number") else "",
+                data_ida=data_ida,
+                data_volta=data_volta,
+                dias_viagem=dias_viagem,
+                fonte=fonte,
+            )
         )
 
         if eh_oportunidade:

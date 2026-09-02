@@ -24,6 +24,7 @@ CABECALHO_HISTORICO = [
     "data_ida",
     "data_volta",
     "dias_viagem",
+    "fonte",
 ]
 
 NOME_ABA_ROTAS = "rotas"
@@ -114,11 +115,17 @@ def carregar_rotas(aba: gspread.Worksheet) -> list[dict]:
     return rotas
 
 
-def carregar_menor_preco_por_rota(aba: gspread.Worksheet) -> dict:
-    """Lê todo o histórico e retorna o menor preço já visto por chave
-    (rota, ou rota+duração quando aplicável — ver montar_chave)."""
+def carregar_registros_historico(aba: gspread.Worksheet) -> list[dict]:
+    """Lê todo o histórico uma única vez (evita ler a planilha duas vezes
+    para derivar menores preços e últimas tentativas do FlightAPI)."""
+    return aba.get_all_records()
+
+
+def calcular_menor_preco_por_rota(registros: list[dict]) -> dict:
+    """Retorna o menor preço já visto por chave (rota, ou rota+duração
+    quando aplicável — ver montar_chave)."""
     menores: dict = {}
-    for registro in aba.get_all_records():
+    for registro in registros:
         chave = montar_chave(registro["origem"], registro["destino"], registro.get("dias_viagem") or None)
         preco = registro["preco"]
         if chave not in menores or preco < menores[chave]:
@@ -126,8 +133,22 @@ def carregar_menor_preco_por_rota(aba: gspread.Worksheet) -> dict:
     return menores
 
 
-def registrar_consulta(
-    aba: gspread.Worksheet,
+def calcular_ultima_consulta_flightapi(registros: list[dict]) -> dict:
+    """Retorna {chave: timestamp} da consulta mais recente feita via
+    FlightAPI (fonte='flightapi') por chave. Usado para limitar a
+    frequência do fallback, já que cada chamada custa créditos."""
+    ultimas: dict = {}
+    for registro in registros:
+        if registro.get("fonte") != "flightapi":
+            continue
+        chave = montar_chave(registro["origem"], registro["destino"], registro.get("dias_viagem") or None)
+        timestamp = registro["timestamp"]
+        if chave not in ultimas or timestamp > ultimas[chave]:
+            ultimas[chave] = timestamp
+    return ultimas
+
+
+def montar_linha_historico(
     timestamp: str,
     origem: str,
     destino: str,
@@ -138,19 +159,28 @@ def registrar_consulta(
     data_ida: str,
     data_volta: Optional[str],
     dias_viagem: Optional[int] = None,
-) -> None:
-    """Acrescenta uma linha de histórico na planilha."""
-    aba.append_row(
-        [
-            timestamp,
-            origem,
-            destino,
-            preco,
-            moeda,
-            companhia,
-            voo,
-            data_ida,
-            data_volta or "",
-            dias_viagem or "",
-        ]
-    )
+    fonte: str = "travelpayouts",
+) -> list:
+    """Monta uma linha de histórico (sem gravar) — ver salvar_historico
+    para gravar todas as linhas de uma execução de uma vez."""
+    return [
+        timestamp,
+        origem,
+        destino,
+        preco,
+        moeda,
+        companhia,
+        voo,
+        data_ida,
+        data_volta or "",
+        dias_viagem or "",
+        fonte,
+    ]
+
+
+def salvar_historico(aba: gspread.Worksheet, linhas: list[list]) -> None:
+    """Grava um lote de linhas de histórico em uma única chamada. Fazer
+    isso em lote (em vez de um append_row por rota) evita colisões de
+    escrita quando várias linhas são gravadas em sequência rápida."""
+    if linhas:
+        aba.append_rows(linhas)

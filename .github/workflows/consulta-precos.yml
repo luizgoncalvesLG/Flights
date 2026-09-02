@@ -43,4 +43,5 @@ jobs:
           GOOGLE_CREDENTIALS_PATH: credentials/google_service_account.json
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
+          FLIGHTAPI_KEY: ${{ secrets.FLIGHTAPI_KEY }}
         run: python -m src.consulta_precos
