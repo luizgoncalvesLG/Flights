@@ -56,6 +56,17 @@ pessoa: ela dá `/start` no bot, depois
 `GET https://api.telegram.org/bot<TOKEN>/getUpdates` mostra o chat_id nas
 mensagens recentes.
 
+**Formato de datas na planilha "historico".** `timestamp` (quando a
+consulta rodou) é gravado em horário de Brasília, formato
+`DD/MM/YYYY HH:MM:SS` (`planilha.formatar_timestamp`). `data_ida` e
+`data_volta` (horário de embarque do voo) mantêm o horário local de cada
+aeroporto tal como veio da API — só muda o formato de exibição, não o
+fuso, já que é isso que interessa pra saber a que horas embarcar
+(`planilha.formatar_data_hora_voo`). Depende do pacote `tzdata` (o
+`zoneinfo` do Python não tem banco de fusos embutido no Windows).
+Migradas as linhas antigas (estavam em ISO 8601 UTC) pro novo formato;
+`planilha._parse_timestamp` entende os dois formatos por segurança.
+
 **Rotas cadastradas na planilha, não mais em arquivo.** A aba "rotas" da
 mesma planilha (colunas: origem, destino, data_inicio, data_fim,
 dias_viagem) substituiu `config/rotas.py` (removido do repo). O usuário
