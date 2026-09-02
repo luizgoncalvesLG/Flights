@@ -69,15 +69,50 @@ fixa/sem data" (endpoint cheapest). Rotas hoje: todas no formato
 intervalo+duração, abril-maio/2027, 20 dias — GRU→LIS, MAD→LIS, GRU→ROM,
 GRU→MIL.
 
-**Limitação conhecida:** o endpoint `v1/prices/calendar` só devolve preço
-quando existe cache pra aquela combinação exata de rota+mês+duração — é
-alimentado por buscas reais de usuários da Aviasales, não por toda rota
-possível. Rotas/durações menos populares (ex: MAD→LIS ou GRU→MIL com 20
-dias) frequentemente voltam "nenhum preço encontrado", mesmo a rota tendo
-cache fora daquela duração específica (confirmado testando sem `length`).
-Decisão do usuário: manter assim — o cron roda a cada 3h e o cache muda
-com o tempo, então pode aparecer dado numa execução futura sem precisar
-mexer no código.
+**Limitação do Travelpayouts e fallback via FlightAPI.io.** O endpoint
+`v1/prices/calendar` só devolve preço quando existe cache pra aquela
+combinação exata de rota+mês+duração. Confirmado com teste direto: pra
+datas muito distantes (7+ meses, ex: abril-maio/2027) em rotas menos
+populares (MAD→LIS, GRU→ROM, GRU→MIL com 20 dias), a API **ignora o mês
+pedido** e devolve sempre o mesmo conjunto de datas em cache (perto de
+hoje) — meu código descarta corretamente por estarem fora do intervalo
+pedido, resultando em "nenhum preço encontrado". Não resolve sozinho com
+o tempo (testado rodando por 14h+ sem mudança).
+
+Solução: quando isso acontece numa rota de intervalo, `src/flightapi.py`
+tenta uma vez o FlightAPI.io (Round Trip API,
+`api.flightapi.io/roundtrip/...`) com uma única data representativa
+(o início do intervalo + dias_viagem) — não varre o intervalo inteiro,
+porque cada chamada custa 2 créditos do free tier (20–100/mês). O
+fallback só é tentado de novo a cada 24h por chave (controlado via nova
+coluna `fonte` no histórico: "travelpayouts" ou "flightapi", ver
+`planilha.calcular_ultima_consulta_flightapi`/`pode_tentar_flightapi`).
+API key em `FLIGHTAPI_KEY` (.env local e secret no GitHub).
+
+Dois bugs encontrados e corrigidos durante a implementação:
+- A resposta do FlightAPI (formato tipo Skyscanner: itineraries/legs/
+  segments/carriers referenciados por id) tem itinerários sem preço
+  válido em algumas `pricing_options` — `flightapi.buscar_menor_oferta`
+  agora filtra por preços válidos antes de calcular o mínimo.
+- Preços do FlightAPI vêm com casas decimais; a planilha (locale BR)
+  confundia o ponto decimal com separador de milhar ao ler de volta via
+  `get_all_records()` (5472.48 virava 547248 no dict lido, embora a
+  célula em si estivesse certa como "5472,48"). Preço agora sempre
+  arredondado pra inteiro antes de gravar, como já era o padrão dos
+  preços do Travelpayouts.
+- Bug separado (não do FlightAPI): múltiplas chamadas de `append_row`
+  em sequência rápida (uma por rota, dentro do mesmo loop) colidiam e
+  perdiam linhas — só a última rota processada ficava gravada. Corrigido
+  acumulando as linhas do histórico durante o loop e gravando todas de
+  uma vez com `append_rows` (`planilha.montar_linha_historico` +
+  `salvar_historico`) dentro de um `try/finally` em
+  `consulta_precos.py`, pra não perder o que já foi coletado mesmo se
+  algo falhar no meio da execução.
+
+**Créditos do FlightAPI.io gastos em testes durante essa sessão:**
+bastante (~12 chamadas reais de roundtrip × 2 créditos ≈ 24 créditos) —
+vale conferir o saldo no dashboard do FlightAPI.io antes de contar com a
+cota do mês.
 
 **Actions do workflow:** `actions/checkout` e `actions/setup-python`
 atualizadas para `@v7` (estavam em v4/v5, que rodavam sobre Node.js 20 —
@@ -118,6 +153,8 @@ alerta conforme os resultados reais.
   separados) e suporte a múltiplos destinatários no Telegram.
 - Cadastro de rotas migrado de `config/rotas.py` para a aba "rotas" da
   planilha — usuário gerencia destinos sem precisar editar código.
+- Fallback via FlightAPI.io quando o Travelpayouts não tem cache pra
+  rota/duração pesquisada (ver seção de limitação acima).
 
 ## Convenções do projeto
 - Linguagem: Python.
