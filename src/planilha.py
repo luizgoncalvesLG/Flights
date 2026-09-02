@@ -5,12 +5,17 @@ configurada em GOOGLE_SHEETS_ID.
 """
 
 import os
+from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import gspread
 from google.oauth2.service_account import Credentials
 
 ESCOPOS = ["https://www.googleapis.com/auth/spreadsheets"]
+
+FUSO_BRASIL = ZoneInfo("America/Sao_Paulo")
+FORMATO_DATA_HORA_BR = "%d/%m/%Y %H:%M:%S"
 
 NOME_ABA_HISTORICO = "historico"
 CABECALHO_HISTORICO = [
@@ -46,6 +51,33 @@ def montar_chave(origem: str, destino: str, dias_viagem: Optional[int] = None) -
     if dias_viagem:
         return f"{origem}-{destino}-{dias_viagem}d"
     return f"{origem}-{destino}"
+
+
+def formatar_timestamp(momento_utc: datetime) -> str:
+    """Formata um datetime UTC (hora em que a consulta rodou) no horário
+    de Brasília, como DD/MM/YYYY HH:MM:SS."""
+    return momento_utc.astimezone(FUSO_BRASIL).strftime(FORMATO_DATA_HORA_BR)
+
+
+def formatar_data_hora_voo(valor_iso: str) -> str:
+    """Formata uma data/hora de voo (data_ida/data_volta) como
+    DD/MM/YYYY HH:MM:SS, mantendo o horário local do voo tal como veio
+    da API (não converte fuso — é o horário do aeroporto, não o de quem
+    consulta). Aceita "YYYY-MM-DD[THH:MM:SS][+HH:MM]"; quando só há data
+    (sem hora), usa 00:00:00."""
+    texto = valor_iso[:19]
+    formato = "%Y-%m-%dT%H:%M:%S" if "T" in texto else "%Y-%m-%d"
+    return datetime.strptime(texto, formato).strftime(FORMATO_DATA_HORA_BR)
+
+
+def _parse_timestamp(texto: str) -> datetime:
+    """Entende tanto o formato atual (DD/MM/YYYY HH:MM:SS, horário de
+    Brasília) quanto o antigo (ISO 8601 UTC, usado antes da migração de
+    formato), para não quebrar ao ler linhas gravadas antes da mudança."""
+    try:
+        return datetime.strptime(texto, FORMATO_DATA_HORA_BR).replace(tzinfo=FUSO_BRASIL)
+    except ValueError:
+        return datetime.fromisoformat(texto).astimezone(FUSO_BRASIL)
 
 
 def abrir_planilha() -> gspread.Spreadsheet:
@@ -134,7 +166,7 @@ def calcular_menor_preco_por_rota(registros: list[dict]) -> dict:
 
 
 def calcular_ultima_consulta_flightapi(registros: list[dict]) -> dict:
-    """Retorna {chave: timestamp} da consulta mais recente feita via
+    """Retorna {chave: datetime} da consulta mais recente feita via
     FlightAPI (fonte='flightapi') por chave. Usado para limitar a
     frequência do fallback, já que cada chamada custa créditos."""
     ultimas: dict = {}
@@ -142,9 +174,9 @@ def calcular_ultima_consulta_flightapi(registros: list[dict]) -> dict:
         if registro.get("fonte") != "flightapi":
             continue
         chave = montar_chave(registro["origem"], registro["destino"], registro.get("dias_viagem") or None)
-        timestamp = registro["timestamp"]
-        if chave not in ultimas or timestamp > ultimas[chave]:
-            ultimas[chave] = timestamp
+        momento = _parse_timestamp(registro["timestamp"])
+        if chave not in ultimas or momento > ultimas[chave]:
+            ultimas[chave] = momento
     return ultimas
 
 

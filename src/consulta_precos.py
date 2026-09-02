@@ -41,11 +41,10 @@ SIMBOLOS_MOEDA = {"brl": "R$", "usd": "US$", "eur": "€"}
 INTERVALO_MINIMO_FLIGHTAPI = timedelta(hours=24)
 
 
-def pode_tentar_flightapi(ultima_tentativa: Optional[str]) -> bool:
+def pode_tentar_flightapi(ultima_tentativa: Optional[datetime]) -> bool:
     if not ultima_tentativa:
         return True
-    momento = datetime.fromisoformat(ultima_tentativa)
-    return datetime.now(timezone.utc) - momento >= INTERVALO_MINIMO_FLIGHTAPI
+    return datetime.now(timezone.utc) - ultima_tentativa >= INTERVALO_MINIMO_FLIGHTAPI
 
 
 def formatar_preco(preco: float, moeda: str) -> str:
@@ -276,15 +275,15 @@ def _consultar_e_notificar(
 
         linhas_historico.append(
             planilha.montar_linha_historico(
-                timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                timestamp=planilha.formatar_timestamp(datetime.now(timezone.utc)),
                 origem=origem,
                 destino=destino,
                 preco=preco_atual,
                 moeda=moeda,
                 companhia=nome_companhia,
                 voo=str(oferta["flight_number"]) if oferta.get("flight_number") else "",
-                data_ida=data_ida,
-                data_volta=data_volta,
+                data_ida=planilha.formatar_data_hora_voo(data_ida),
+                data_volta=planilha.formatar_data_hora_voo(data_volta) if data_volta else None,
                 dias_viagem=dias_viagem,
                 fonte=fonte,
             )
