@@ -1,7 +1,7 @@
 """
-Consulta a Data API do Travelpayouts para as rotas definidas em
-config/rotas.py, compara com o menor preço já visto (histórico no Google
-Sheets) e reporta oportunidades.
+Consulta a Data API do Travelpayouts para as rotas cadastradas na aba
+"rotas" da planilha do Google Sheets, compara com o menor preço já visto
+(aba "historico") e reporta oportunidades.
 
 Cada rota pode ser buscada de duas formas:
 - Data fixa (ou sem data): usa o endpoint "Cheapest Tickets"
@@ -23,7 +23,6 @@ from typing import Optional
 import requests
 from dotenv import load_dotenv
 
-from config.rotas import ROTAS
 from src import companhias, notificacao, planilha
 
 URL_CHEAPEST = "https://api.travelpayouts.com/v1/prices/cheap"
@@ -153,11 +152,18 @@ def main() -> None:
         sys.exit("Defina TRAVELPAYOUTS_TOKEN no arquivo .env (veja .env.example).")
     moeda = os.environ.get("MOEDA", "brl")
 
-    aba = planilha.conectar()
-    menores_precos = planilha.carregar_menor_preco_por_rota(aba)
+    spreadsheet = planilha.abrir_planilha()
+    aba_historico = planilha.obter_aba_historico(spreadsheet)
+    aba_rotas = planilha.obter_aba_rotas(spreadsheet)
+
+    rotas = planilha.carregar_rotas(aba_rotas)
+    if not rotas:
+        sys.exit("Nenhuma rota cadastrada na aba 'rotas' da planilha.")
+
+    menores_precos = planilha.carregar_menor_preco_por_rota(aba_historico)
     nomes_companhias = companhias.carregar_nomes()
 
-    for rota in ROTAS:
+    for rota in rotas:
         origem, destino = rota["origem"], rota["destino"]
         dias_viagem = rota.get("dias_viagem")
 
@@ -206,7 +212,7 @@ def main() -> None:
             data_volta = (date.fromisoformat(data_ida[:10]) + timedelta(days=dias_viagem)).isoformat()
 
         planilha.registrar_consulta(
-            aba,
+            aba_historico,
             timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
             origem=origem,
             destino=destino,
