@@ -54,9 +54,20 @@ sempre que o preço atual é um novo mínimo pra chave, com preço em R$
 "Cia: X / Voo: Y" em campo separado. Pra descobrir o chat_id de uma nova
 pessoa: ela dá `/start` no bot, depois
 `GET https://api.telegram.org/bot<TOKEN>/getUpdates` mostra o chat_id nas
-mensagens recentes. Rotas hoje em
-`config/rotas.py`: todas no formato intervalo+duração, abril-maio/2027,
-20 dias — GRU→LIS, MAD→LIS, GRU→ROM, GRU→MIL.
+mensagens recentes.
+
+**Rotas cadastradas na planilha, não mais em arquivo.** A aba "rotas" da
+mesma planilha (colunas: origem, destino, data_inicio, data_fim,
+dias_viagem) substituiu `config/rotas.py` (removido do repo). O usuário
+adiciona/remove destinos direto editando a planilha — `src/planilha.py`
+(`obter_aba_rotas`/`carregar_rotas`) lê essa aba a cada execução; se a
+aba não existir ainda, é criada automaticamente com as 4 rotas que
+estavam no antigo rotas.py como seed (`ROTAS_INICIAIS`, só usado na
+criação — depois disso editar essa constante no código não tem efeito).
+Linhas com data_inicio/data_fim/dias_viagem em branco caem no modo "data
+fixa/sem data" (endpoint cheapest). Rotas hoje: todas no formato
+intervalo+duração, abril-maio/2027, 20 dias — GRU→LIS, MAD→LIS, GRU→ROM,
+GRU→MIL.
 
 **Limitação conhecida:** o endpoint `v1/prices/calendar` só devolve preço
 quando existe cache pra aquela combinação exata de rota+mês+duração — é
@@ -79,7 +90,7 @@ a cada 3 horas (cron `0 */3 * * *`, em UTC) e também aceita disparo manual
 via `workflow_dispatch`. Os segredos ficam em GitHub Secrets
 (`TRAVELPAYOUTS_TOKEN`, `GOOGLE_SHEETS_ID`, `GOOGLE_CREDENTIALS_JSON` —
 conteúdo inteiro do JSON da service account —, `TELEGRAM_BOT_TOKEN`,
-`TELEGRAM_CHAT_ID`); o workflow recria o arquivo de credenciais a partir
+`TELEGRAM_CHAT_IDS`); o workflow recria o arquivo de credenciais a partir
 do secret usando `printf` com o valor vindo de `env:` (NÃO usar
 `echo "${{ secrets.X }}"` direto dentro de aspas — quebra se o JSON tiver
 aspas internas) e valida que o JSON gerado é válido antes de seguir.
@@ -103,6 +114,10 @@ alerta conforme os resultados reais.
 - Busca por intervalo de datas + duração da viagem (não estava no roteiro
   original, adicionado depois a pedido do usuário).
 - Nomes de companhia aérea legíveis em vez de código IATA.
+- Mensagem de notificação reformatada (R$, datas dd/mm/aaaa, Cia/Voo
+  separados) e suporte a múltiplos destinatários no Telegram.
+- Cadastro de rotas migrado de `config/rotas.py` para a aba "rotas" da
+  planilha — usuário gerencia destinos sem precisar editar código.
 
 ## Convenções do projeto
 - Linguagem: Python.
